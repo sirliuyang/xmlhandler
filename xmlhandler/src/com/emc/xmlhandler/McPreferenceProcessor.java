@@ -51,9 +51,7 @@ public class McPreferenceProcessor {
         current = args[2];
         
         logFile = args[3];
-        mergeResultFile = args[4];
-        
-        String option = args[5].trim();
+        String option = args[4].trim();
 
         // Backup file if needed
         // copy(current, outputFilePath);
@@ -63,13 +61,13 @@ public class McPreferenceProcessor {
         load(bakFile, entries_bak);
         // load(current, entries_current);
         loadExcludes();
-        /*manualUpdate();*/
         
         if (option != null) {
             if (option.equals("report")) {
                 report();
             }
             if (option.equals("update")) {
+                mergeResultFile = args[5];
                 manualUpdate();
             }
         }
@@ -287,7 +285,7 @@ public class McPreferenceProcessor {
                             {
                                 noUpdate = false;
                                 // Replace the value
-                                buf.append("Current Entry:\n" + line + "\nRecommended Entry: \n"
+                                buf.append("Unexpected result :\nCurrent Entry:\n" + line + "\nRecommended Entry: \n"
                                         + newLine + "\n\n");
                             }
 
