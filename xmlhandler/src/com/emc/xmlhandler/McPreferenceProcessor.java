@@ -17,22 +17,13 @@ import java.util.List;
 import java.util.Map;
 
 public class McPreferenceProcessor {
-/*
-    static String rootPath = "C:\\Users\\liul41\\Desktop\\maintance\\esc27867\\Compare_Test\\";
-    static String libFile = rootPath + "mcserver.lib.xml";
-    static String bakFile = rootPath + "mcserver.bak.xml";
-    static String current = rootPath + "mcserver.current.xml";
-    static String temp = rootPath + "temp.xml";
-    static String logFile = rootPath + "report.log";
-    static String mergeResultFile = rootPath + "mcserver.result.xml";  
-*/    
-    static String rootPath ;
+
     static String libFile;
     static String bakFile;
     static String current;
-    static String temp;
-    static String logFile;
+
     static String mergeResultFile;
+    static String logFile;
 
     static final List<String> excludes = new ArrayList<String>();
     static String Node = "";
@@ -45,23 +36,15 @@ public class McPreferenceProcessor {
     static boolean noUpdate;
 
     public static void main(String[] args) {
-
         libFile = args[0];
         bakFile = args[1];
         current = args[2];
-        
+
         logFile = args[3];
         String option = args[4].trim();
 
-        // Backup file if needed
-        // copy(current, outputFilePath);
+        loadAll();
 
-        // Load all file to container
-        load(libFile, entries_lib);
-        load(bakFile, entries_bak);
-        // load(current, entries_current);
-        loadExcludes();
-        
         if (option != null) {
             if (option.equals("report")) {
                 report();
@@ -79,64 +62,88 @@ public class McPreferenceProcessor {
 
     public static void report() {
         update(logFile, prepareReport(current));
-        System.out.println("Please check the report at:"+logFile);
+        System.out.println("Please check the report at:" + logFile);
     }
 
-    public static void manualUpdate() {
+    // Load all file to container
+    private static void loadAll() {
+        load(libFile, entries_lib);
+        load(bakFile, entries_bak);
+        load(current, entries_current);
+        loadExcludes();
+    }
+
+    public static void loadAll(String lib, String bak, String cur, String log) {
+        libFile = lib;
+        bakFile = bak;
+        current = cur;
+        logFile = log;
+        load(libFile, entries_lib);
+        load(bakFile, entries_bak);
+        load(current, entries_current);
+        loadExcludes();
+    }
+
+    private static void manualUpdate() {
         Map<String, String> result = prepareContentWithInteract(current);
         update(mergeResultFile, result.get("mcserver"));
         update(logFile, result.get("report"));
         System.out.println("Preference mcserver.xml has been update.");
-        System.out.println("More detail, please check the report at:"+logFile);
+        System.out.println("More detail, please check the report at:" + logFile);
     }
+
     // the content of line which will write to file
     // Merge logic is here
-    public static String finalValue(String line, String node) {
-        // String key = parse("key", line);
-        String key = Utils.parseKey(line);
+    private static String finalValue(String line, String node) {
 
-        // System.out.println("Node: " + node + " " + line);
+        String result = null;
+        String key = Utils.parseKey(line);
+        String bakValue = valueFromBak(key, node);
+        String libValue = valueFromLib(key, node);;
+        String libMergeType = mergeInfoFromLib(key, node);
+        String bakMergeType = mergeInfoFromBak(key, node);
+
         // Excludes the special case
         if (!isExcluded(key)) {
-            if (mergeInfoFromLib(key, node) == null || mergeInfoFromLib(key, node).equals("")) {
-                return valueFromBak(key);
+            if (bakValue == null) {
+                result = libValue;
             } else {
-                /*
-                 * if (mergeInfoFromLib(key).equals("delete")) { return INVALIDTAG; }
-                 */
-                if (mergeInfoFromLib(key, node).equals("newvalue")) {
-                    if (mergeInfoFromBak(key, node) != null
-                            && mergeInfoFromBak(key, node).equals("keep"))
-                        return valueFromBak(key);
-                    else
-                        return valueFromLib(key);
+                if (libMergeType == null || libMergeType.equals("")) {
+                    result = bakValue;
+                } else {
+                    if (libMergeType.equals("newvalue")) {
+                        if (bakMergeType != null && bakMergeType.equals("keep"))
+                            result = bakValue;
+                        else
+                            result = libValue;
+                    }
                 }
             }
         }
-        return null;
+        return result;
     }
 
-    public static String valueFromLib(String key) {
-        return findValueByKey(key, entries_lib);
+    private static String valueFromLib(String key, String node) {
+        return findValueByKey(key, node, entries_lib);
     }
 
-    public static String valueFromBak(String key) {
-        return findValueByKey(key, entries_bak);
+    private static String valueFromBak(String key, String node) {
+        return findValueByKey(key, node, entries_bak);
     }
 
     // We think the merge of Lib must be in the same line, if merge is null, that only means there
     // is no merge
-    public static String mergeInfoFromLib(String key, String node) {
+    private static String mergeInfoFromLib(String key, String node) {
         return findMergeByKey(key, node, entries_lib);
     }
 
     // TODO : if user wrap the line, the merge cannot be read
-    public static String mergeInfoFromBak(String key, String node) {
+    private static String mergeInfoFromBak(String key, String node) {
         return findMergeByKey(key, node, entries_bak);
     }
 
     // You can do the backup
-    public static void copy(String from, String to) {
+    private static void copy(String from, String to) {
         File source = new File(from);
         File target = new File(to);
         FileChannel in = null;
@@ -166,7 +173,7 @@ public class McPreferenceProcessor {
         }
     }
 
-    public static void load(String path, List<Entry> entries) {
+    private static void load(String path, List<Entry> entries) {
         BufferedReader br;
         try {
             br = new BufferedReader(new InputStreamReader(new FileInputStream(path)));
@@ -190,7 +197,7 @@ public class McPreferenceProcessor {
         }
     }
 
-    public static Entry convertToEntry(String data, String node) {
+    private static Entry convertToEntry(String data, String node) {
         Entry entry = new Entry();
         /*
          * entry.setKEY_DESC(parse("key", data)); entry.setVALUE_DESC(parse("value", data));
@@ -203,15 +210,15 @@ public class McPreferenceProcessor {
         return entry;
     }
 
-    public static String findValueByKey(String key, List<Entry> entries) {
+    private static String findValueByKey(String key, String node, List<Entry> entries) {
         for (Entry entry : entries) {
-            if (entry.getKEY_DESC().equals(key))
+            if (entry.getKEY_DESC().equals(key) && entry.getNode().equals(node))
                 return entry.getVALUE_DESC();
         }
         return null;
     }
 
-    public static String findMergeByKey(String key, String node, List<Entry> entries) {
+    private static String findMergeByKey(String key, String node, List<Entry> entries) {
         for (Entry entry : entries) {
             if (entry.getKEY_DESC().equals(key) && entry.getNode().equals(node))
                 return entry.getMERGE_DESC();
@@ -219,7 +226,7 @@ public class McPreferenceProcessor {
         return null;
     }
 
-    public static String prepareContent(String filePath) {
+    private static String prepareContent(String filePath) {
         BufferedReader br = null;
         String line = null;
         StringBuffer buf = new StringBuffer();
@@ -229,8 +236,7 @@ public class McPreferenceProcessor {
             while ((line = br.readLine()) != null) {
                 setNode(line);
                 // An Entry must have key and value, if not, ignore
-                if (Utils.parseKey(line) != null && Node != null
-                        && Utils.parseValue(line) != null) {
+                if (Utils.parseKey(line) != null && Node != null && Utils.parseValue(line) != null) {
                     if (mergeInfoFromLib(Utils.parseKey(line), Node) != null
                             && mergeInfoFromLib(Utils.parseKey(line), Node).equals("delete")) {
                         // System.out.println(line);
@@ -260,7 +266,7 @@ public class McPreferenceProcessor {
         return buf.toString();
     }
 
-    public static String prepareReport(String filePath) {
+    private static String prepareReport(String filePath) {
         BufferedReader br = null;
         String line = null;
         StringBuffer buf = new StringBuffer();
@@ -271,8 +277,7 @@ public class McPreferenceProcessor {
             while ((line = br.readLine()) != null) {
                 setNode(line);
                 // An Entry must have key and value, if not, ignore
-                if (Utils.parseKey(line) != null && Node != null
-                        && Utils.parseValue(line) != null) {
+                if (Utils.parseKey(line) != null && Node != null && Utils.parseValue(line) != null) {
                     if (mergeInfoFromLib(Utils.parseKey(line), Node) != null
                             && mergeInfoFromLib(Utils.parseKey(line), Node).equals("delete")) {
                         // System.out.println(line);
@@ -281,11 +286,10 @@ public class McPreferenceProcessor {
                         String replaceValue = finalValue(line, Node);
                         String newLine = Utils.getNewLine(line, replaceValue);
                         if (replaceValue != null && newLine != null) {
-                            if (!replaceValue.equals(Utils.parseValue(line)))
-                            {
+                            if (!replaceValue.equals(Utils.parseValue(line))) {
                                 noUpdate = false;
                                 // Replace the value
-                                buf.append("Unexpected result :\nCurrent Entry:\n" + line + "\nRecommended Entry: \n"
+                                buf.append("Unexpected result at node : "+Node+"\nCurrent Entry:\n" + line + "\nRecommended Entry: \n"
                                         + newLine + "\n\n");
                             }
 
@@ -300,19 +304,19 @@ public class McPreferenceProcessor {
             e.printStackTrace();
             System.exit(1);
         }
-        
-        if(noUpdate){
+
+        if (noUpdate) {
             System.out.println("There is no difference, exit.");
-            System.exit(0);
+            return "Preference is correct.";
         }
-        
+
         System.out.println("-----------------Difference Report-----------------");
         System.out.println(buf.toString());
         System.out.println("---------------------------------------------------");
         return buf.toString();
     }
 
-    public static Map<String, String> prepareContentWithInteract(String filePath) {
+    private static Map<String, String> prepareContentWithInteract(String filePath) {
         BufferedReader br = null;
         String line = null;
         Map<String, String> resultMap = new HashMap<String, String>();
@@ -336,32 +340,36 @@ public class McPreferenceProcessor {
                     } else {
                         String replaceValue = finalValue(line, Node);
                         String newLine = Utils.getNewLine(line, replaceValue);
-                        if (replaceValue != null && newLine != null
-                                && !replaceValue.equals(currentValue)) {
+                        if (replaceValue != null && newLine != null && !replaceValue.equals(currentValue)) {
                             noUpdate = false;
-                            if(tag==false){
-                                System.out.println("Please input \"0\" or \"1\" to select each entry's value to update (\"0\" to select current value or \"1\" to select recommended value):");
-                                bufReport.append("Summary Of Update Result:\n");
-                                bufReport.append("+---------------------------------------------------------------------------------+\n");
-                                String reportHeader = String.format("|%-40s|%-40s|\n","Key","Value");
-                                bufReport.append(reportHeader);
-                                bufReport.append("|---------------------------------------------------------------------------------|\n");
-                                tag=true;
-                            }
-                            System.out.println("+-------------------------------------------------------------------------------------------+");
-                            String s = String.format("|%-36s|%-32s|%-21s|","Key","0-Current Value","1-Recommended Value");
-                            System.out.println(s);
-                            System.out.println("|-------------------------------------------------------------------------------------------|");
-                            String s1 = String.format("|%-36s|%-32s|%-21s|", currentKey,currentValue,replaceValue);
-                            System.out.println(s1);
-                            System.out.println("+-------------------------------------------------------------------------------------------+");
-                            System.out.print("Your choice:");
-                            BufferedReader intputReader =
-                                    new BufferedReader(new InputStreamReader(System.in));
-                            String inputText = intputReader.readLine();
-                            while (!Utils.isInputValid(inputText,"0-1")) {
+                            if (tag == false) {
                                 System.out.println(
-                                        "Incorrect input, please only input 0 or 1, then press \"Enter\"");
+                                        "Please input \"0\" or \"1\" to select each entry's value to update (\"0\" to select current value or \"1\" to select recommended value):");
+                                bufReport.append("Summary Of Update Result:\n");
+                                bufReport.append(
+                                        "+---------------------------------------------------------------------------------+\n");
+                                String reportHeader = String.format("|%-40s|%-40s|\n", "Key", "Value");
+                                bufReport.append(reportHeader);
+                                bufReport.append(
+                                        "|---------------------------------------------------------------------------------|\n");
+                                tag = true;
+                            }
+                            System.out.println(
+                                    "+-------------------------------------------------------------------------------------------+");
+                            String s = String.format("|%-36s|%-32s|%-21s|", "Key", "0-Current Value",
+                                    "1-Recommended Value");
+                            System.out.println(s);
+                            System.out.println(
+                                    "|-------------------------------------------------------------------------------------------|");
+                            String s1 = String.format("|%-36s|%-32s|%-21s|", currentKey, currentValue, replaceValue);
+                            System.out.println(s1);
+                            System.out.println(
+                                    "+-------------------------------------------------------------------------------------------+");
+                            System.out.print("Your choice:");
+                            BufferedReader intputReader = new BufferedReader(new InputStreamReader(System.in));
+                            String inputText = intputReader.readLine();
+                            while (!Utils.isInputValid(inputText, "0-1")) {
+                                System.out.println("Incorrect input, please only input 0 or 1, then press \"Enter\"");
                                 System.out.println("Your choice:");
                                 intputReader = new BufferedReader(new InputStreamReader(System.in));
                                 inputText = intputReader.readLine();
@@ -369,18 +377,20 @@ public class McPreferenceProcessor {
                             //
                             if (inputText.trim().equals("0")) {
                                 bufXml.append(line + "\n");
-                                
+
                                 String reportLine1 = String.format("|%-40s|%-40s|\n", currentKey, currentValue);
                                 bufReport.append(reportLine1);
-                                bufReport.append("|---------------------------------------------------------------------------------|\n");
+                                bufReport.append(
+                                        "|---------------------------------------------------------------------------------|\n");
 
                             }
                             if (inputText.trim().equals("1")) {
                                 bufXml.append(newLine + "\n");
-                                
+
                                 String reportLine3 = String.format("|%-40s|%-40s|\n", currentKey, replaceValue);
                                 bufReport.append(reportLine3);
-                                bufReport.append("|---------------------------------------------------------------------------------|\n");
+                                bufReport.append(
+                                        "|---------------------------------------------------------------------------------|\n");
 
                             }
                         } else {
@@ -399,26 +409,24 @@ public class McPreferenceProcessor {
             e.printStackTrace();
             System.exit(1);
         }
-        if(noUpdate){
+        if (noUpdate) {
             System.out.println("There is no difference, exit.");
             System.exit(55);
         }
         System.out.println(bufReport.toString());
         System.out.println("The preference mcserver.xml will be updated as above, are you sure ?");
         System.out.println("\"Yes\" or \"No\":");
-        BufferedReader intputReader =
-                new BufferedReader(new InputStreamReader(System.in));
+        BufferedReader intputReader = new BufferedReader(new InputStreamReader(System.in));
         String inputText;
         try {
             inputText = intputReader.readLine();
-            while (!Utils.isInputValid(inputText,"YN")) {
-                System.out.println(
-                        "Incorrect input, please input \"yes\" or \"no\", then press \"Enter\"");
+            while (!Utils.isInputValid(inputText, "YN")) {
+                System.out.println("Incorrect input, please input \"yes\" or \"no\", then press \"Enter\"");
                 System.out.print("Your choice:");
                 intputReader = new BufferedReader(new InputStreamReader(System.in));
                 inputText = intputReader.readLine();
             }
-            if(inputText.trim().equalsIgnoreCase("no")){
+            if (inputText.trim().equalsIgnoreCase("no")) {
                 System.exit(55);
             }
         } catch (IOException e) {
@@ -431,7 +439,7 @@ public class McPreferenceProcessor {
         return resultMap;
     }
 
-    public static void update(String filePath, String content) {
+    private static void update(String filePath, String content) {
         BufferedWriter bw = null;
 
         try {
@@ -450,16 +458,7 @@ public class McPreferenceProcessor {
         }
     }
 
-
-
-    /*
-     * // Move to Utils public static String parse(String filter, String data) { if
-     * (data.contains(filter)) { String temp; int length = filter.length() + 2; int idx =
-     * data.indexOf(filter + "=\""); temp = data.substring(idx + length); idx = temp.indexOf("\"");
-     * temp = temp.substring(0, idx); return temp; } else return null; }
-     */
-
-    public static boolean isExcluded(String keyname) {
+    private static boolean isExcluded(String keyname) {
         for (String key : excludes) {
             if (key.equals(keyname))
                 return true;
@@ -467,15 +466,7 @@ public class McPreferenceProcessor {
         return false;
     }
 
-    /*
-     * // Move To Utils public static String getNewLine(String line, String newvalue) { StringBuffer
-     * result = new StringBuffer(); String matcher = "value=\""; if (line.indexOf(matcher) == -1) {
-     * return null; } int idx = line.indexOf(matcher) + matcher.length();
-     * result.append(line.substring(0, idx)); result.append(newvalue + "\" />"); return
-     * result.toString(); }
-     */
-
-    public static void setNode(String line) {
+    private static void setNode(String line) {
         String node = Utils.getNode(line);
         if (node != null) {
             Node = node;
